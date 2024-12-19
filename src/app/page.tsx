@@ -14,6 +14,13 @@ export interface VisualizerSettings {
   glow: boolean;
 }
 
+export interface ExportSettings {
+  quality: 'high' | 'medium' | 'low';
+  format: 'mp4' | 'webm';
+  fps: 30 | 60;
+  resolution: '720p' | '1080p';
+}
+
 const COLOR_SCHEMES = {
   greenRed: { start: '#00ff00', end: '#ff0000' },
   bluePurple: { start: '#00ffff', end: '#ff00ff' },
@@ -37,10 +44,17 @@ export default function Home() {
   const [visualizerSettings, setVisualizerSettings] = useState<VisualizerSettings>({
     barSpacing: 1,
     barHeight: 0.7,
-    colorScheme: 'greenRed',
+    colorScheme: 'neon',
     position: 'bottom',
     shape: 'rounded',
-    glow: false
+    glow: true
+  });
+
+  const [exportSettings, setExportSettings] = useState<ExportSettings>({
+    quality: 'high',
+    format: 'mp4',
+    fps: 30,
+    resolution: '1080p'
   });
 
   const onDropAudio = useCallback((acceptedFiles: File[]) => {
@@ -223,108 +237,179 @@ export default function Home() {
         </div>
 
         {/* Right Column - Settings */}
-        <div className="bg-gray-800/30 backdrop-blur-sm rounded-xl p-4 border border-gray-700/50">
-          <h2 className="font-semibold mb-6 text-lg">Visualizer Settings</h2>
-          
-          <div className="space-y-6">
-            <div>
-              <label className="block text-sm text-gray-400 mb-2">Bar Spacing</label>
-              <input
-                type="range"
-                min="0"
-                max="10"
-                value={visualizerSettings.barSpacing}
-                onChange={(e) => setVisualizerSettings(prev => ({
-                  ...prev,
-                  barSpacing: Number(e.target.value)
-                }))}
-                className="w-full accent-blue-500"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm text-gray-400 mb-2">Bar Height</label>
-              <input
-                type="range"
-                min="0.1"
-                max="2"
-                step="0.1"
-                value={visualizerSettings.barHeight}
-                onChange={(e) => setVisualizerSettings(prev => ({
-                  ...prev,
-                  barHeight: Number(e.target.value)
-                }))}
-                className="w-full accent-blue-500"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm text-gray-400 mb-2">Bar Shape</label>
-              <select
-                value={visualizerSettings.shape}
-                onChange={(e) => setVisualizerSettings(prev => ({
-                  ...prev,
-                  shape: e.target.value as VisualizerSettings['shape']
-                }))}
-                className="w-full bg-gray-700/50 border border-gray-600/50 rounded-lg px-3 py-2 text-sm"
-              >
-                <option value="rounded">Rounded</option>
-                <option value="rectangle">Rectangle</option>
-                <option value="pill">Pill</option>
-                <option value="triangle">Triangle</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-sm text-gray-400 mb-2">Color Scheme</label>
-              <select
-                value={visualizerSettings.colorScheme}
-                onChange={(e) => setVisualizerSettings(prev => ({
-                  ...prev,
-                  colorScheme: e.target.value as VisualizerSettings['colorScheme']
-                }))}
-                className="w-full bg-gray-700/50 border border-gray-600/50 rounded-lg px-3 py-2 text-sm"
-              >
-                <option value="greenRed">Green to Red</option>
-                <option value="bluePurple">Blue to Purple</option>
-                <option value="rainbow">Rainbow</option>
-                <option value="purpleGold">Purple to Gold</option>
-                <option value="oceanBlue">Ocean Blue</option>
-                <option value="sunset">Sunset</option>
-                <option value="neon">Neon</option>
-                <option value="white">White</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-sm text-gray-400 mb-2">Position</label>
-              <select
-                value={visualizerSettings.position}
-                onChange={(e) => setVisualizerSettings(prev => ({
-                  ...prev,
-                  position: e.target.value as VisualizerSettings['position']
-                }))}
-                className="w-full bg-gray-700/50 border border-gray-600/50 rounded-lg px-3 py-2 text-sm"
-              >
-                <option value="bottom">Bottom</option>
-                <option value="top">Top</option>
-              </select>
-            </div>
-
-            <div className="flex items-center justify-between">
-              <label className="text-sm text-gray-400">Glow Effect</label>
-              <button
-                onClick={() => setVisualizerSettings(prev => ({ ...prev, glow: !prev.glow }))}
-                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 focus:outline-none ${
-                  visualizerSettings.glow ? 'bg-blue-600' : 'bg-gray-700'
-                }`}
-              >
-                <span
-                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform duration-200 ${
-                    visualizerSettings.glow ? 'translate-x-6' : 'translate-x-1'
-                  }`}
+        <div className="bg-gray-800/30 backdrop-blur-sm rounded-xl p-4 border border-gray-700/50 space-y-8 overflow-y-auto">
+          {/* Visualizer Settings */}
+          <div>
+            <h2 className="font-semibold mb-6 text-lg">Visualizer Settings</h2>
+            
+            <div className="space-y-6">
+              <div>
+                <label className="block text-sm text-gray-400 mb-2">Bar Spacing</label>
+                <input
+                  type="range"
+                  min="0"
+                  max="10"
+                  value={visualizerSettings.barSpacing}
+                  onChange={(e) => setVisualizerSettings(prev => ({
+                    ...prev,
+                    barSpacing: Number(e.target.value)
+                  }))}
+                  className="w-full accent-blue-500"
                 />
-              </button>
+              </div>
+
+              <div>
+                <label className="block text-sm text-gray-400 mb-2">Bar Height</label>
+                <input
+                  type="range"
+                  min="0.1"
+                  max="2"
+                  step="0.1"
+                  value={visualizerSettings.barHeight}
+                  onChange={(e) => setVisualizerSettings(prev => ({
+                    ...prev,
+                    barHeight: Number(e.target.value)
+                  }))}
+                  className="w-full accent-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm text-gray-400 mb-2">Bar Shape</label>
+                <select
+                  value={visualizerSettings.shape}
+                  onChange={(e) => setVisualizerSettings(prev => ({
+                    ...prev,
+                    shape: e.target.value as VisualizerSettings['shape']
+                  }))}
+                  className="w-full bg-gray-700/50 border border-gray-600/50 rounded-lg px-3 py-2 text-sm"
+                >
+                  <option value="rounded">Rounded</option>
+                  <option value="rectangle">Rectangle</option>
+                  <option value="pill">Pill</option>
+                  <option value="triangle">Triangle</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm text-gray-400 mb-2">Color Scheme</label>
+                <select
+                  value={visualizerSettings.colorScheme}
+                  onChange={(e) => setVisualizerSettings(prev => ({
+                    ...prev,
+                    colorScheme: e.target.value as VisualizerSettings['colorScheme']
+                  }))}
+                  className="w-full bg-gray-700/50 border border-gray-600/50 rounded-lg px-3 py-2 text-sm"
+                >
+                  <option value="greenRed">Green to Red</option>
+                  <option value="bluePurple">Blue to Purple</option>
+                  <option value="rainbow">Rainbow</option>
+                  <option value="purpleGold">Purple to Gold</option>
+                  <option value="oceanBlue">Ocean Blue</option>
+                  <option value="sunset">Sunset</option>
+                  <option value="neon">Neon</option>
+                  <option value="white">White</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm text-gray-400 mb-2">Position</label>
+                <select
+                  value={visualizerSettings.position}
+                  onChange={(e) => setVisualizerSettings(prev => ({
+                    ...prev,
+                    position: e.target.value as VisualizerSettings['position']
+                  }))}
+                  className="w-full bg-gray-700/50 border border-gray-600/50 rounded-lg px-3 py-2 text-sm"
+                >
+                  <option value="bottom">Bottom</option>
+                  <option value="top">Top</option>
+                </select>
+              </div>
+
+              <div className="flex items-center justify-between">
+                <label className="text-sm text-gray-400">Glow Effect</label>
+                <button
+                  onClick={() => setVisualizerSettings(prev => ({ ...prev, glow: !prev.glow }))}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 focus:outline-none ${
+                    visualizerSettings.glow ? 'bg-blue-600' : 'bg-gray-700'
+                  }`}
+                >
+                  <span
+                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform duration-200 ${
+                      visualizerSettings.glow ? 'translate-x-6' : 'translate-x-1'
+                    }`}
+                  />
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Export Settings */}
+          <div>
+            <h2 className="font-semibold mb-6 text-lg">Export Settings</h2>
+            
+            <div className="space-y-6">
+              <div>
+                <label className="block text-sm text-gray-400 mb-2">Quality</label>
+                <select
+                  value={exportSettings.quality}
+                  onChange={(e) => setExportSettings(prev => ({
+                    ...prev,
+                    quality: e.target.value as ExportSettings['quality']
+                  }))}
+                  className="w-full bg-gray-700/50 border border-gray-600/50 rounded-lg px-3 py-2 text-sm"
+                >
+                  <option value="high">High (8 Mbps)</option>
+                  <option value="medium">Medium (4 Mbps)</option>
+                  <option value="low">Low (2 Mbps)</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm text-gray-400 mb-2">Format</label>
+                <select
+                  value={exportSettings.format}
+                  onChange={(e) => setExportSettings(prev => ({
+                    ...prev,
+                    format: e.target.value as ExportSettings['format']
+                  }))}
+                  className="w-full bg-gray-700/50 border border-gray-600/50 rounded-lg px-3 py-2 text-sm"
+                >
+                  <option value="mp4">MP4 (H.264)</option>
+                  <option value="webm">WebM (VP9)</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm text-gray-400 mb-2">Frame Rate</label>
+                <select
+                  value={exportSettings.fps}
+                  onChange={(e) => setExportSettings(prev => ({
+                    ...prev,
+                    fps: Number(e.target.value) as ExportSettings['fps']
+                  }))}
+                  className="w-full bg-gray-700/50 border border-gray-600/50 rounded-lg px-3 py-2 text-sm"
+                >
+                  <option value="30">30 FPS</option>
+                  <option value="60">60 FPS</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm text-gray-400 mb-2">Resolution</label>
+                <select
+                  value={exportSettings.resolution}
+                  onChange={(e) => setExportSettings(prev => ({
+                    ...prev,
+                    resolution: e.target.value as ExportSettings['resolution']
+                  }))}
+                  className="w-full bg-gray-700/50 border border-gray-600/50 rounded-lg px-3 py-2 text-sm"
+                >
+                  <option value="1080p">1080p (1920x1080)</option>
+                  <option value="720p">720p (1280x720)</option>
+                </select>
+              </div>
             </div>
           </div>
         </div>

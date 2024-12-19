@@ -3,12 +3,13 @@
 import { FFmpeg } from '@ffmpeg/ffmpeg';
 import { fetchFile, toBlobURL } from '@ffmpeg/util';
 import { useEffect, useRef, useState } from 'react';
-import { VisualizerSettings } from '@/app/page';
+import { VisualizerSettings, ExportSettings } from '@/app/page';
 
 interface VideoExporterProps {
   audioFile: File;
   imageFile: File;
   settings: VisualizerSettings;
+  exportSettings: ExportSettings;
   onProgress: (progress: number) => void;
   onComplete: (url: string) => void;
   onError: (error: string) => void;
@@ -17,7 +18,8 @@ interface VideoExporterProps {
 export default function VideoExporter({ 
   audioFile, 
   imageFile, 
-  settings, 
+  settings,
+  exportSettings,
   onProgress, 
   onComplete,
   onError 
@@ -31,8 +33,10 @@ export default function VideoExporter({
 
   const setupCanvas = async () => {
     const canvas = document.createElement('canvas');
-    canvas.width = 1280;
-    canvas.height = 720;
+    const width = exportSettings.resolution === '1080p' ? 1920 : 1280;
+    const height = exportSettings.resolution === '1080p' ? 1080 : 720;
+    canvas.width = width;
+    canvas.height = height;
     canvasRef.current = canvas;
     
     const ctx = canvas.getContext('2d')!;
@@ -222,21 +226,31 @@ export default function VideoExporter({
       await captureFrames(audioBuffer, ctx, img);
       
       // Generate video from frames
+      const outputExt = exportSettings.format === 'webm' ? 'webm' : 'mp4';
+      const codec = exportSettings.format === 'webm' ? 'libvpx-vp9' : 'libx264';
+      const bitrate = {
+        high: '8M',
+        medium: '4M',
+        low: '2M'
+      }[exportSettings.quality];
+
       await ffmpeg.exec([
-        '-framerate', '30',
+        '-framerate', exportSettings.fps.toString(),
         '-i', 'frame%06d.jpg',
         '-i', 'input.mp3',
-        '-c:v', 'libx264',
-        '-c:a', 'aac',
+        '-c:v', codec,
+        '-c:a', exportSettings.format === 'webm' ? 'libvorbis' : 'aac',
+        '-b:v', bitrate,
         '-pix_fmt', 'yuv420p',
         '-shortest',
-        'output.mp4'
+        `output.${outputExt}`
       ]);
       onProgress(90);
 
       // Read the output file
-      const data = await ffmpeg.readFile('output.mp4');
-      const blob = new Blob([data], { type: 'video/mp4' });
+      const data = await ffmpeg.readFile(`output.${outputExt}`);
+      const mimeType = exportSettings.format === 'webm' ? 'video/webm' : 'video/mp4';
+      const blob = new Blob([data], { type: mimeType });
       const url = URL.createObjectURL(blob);
       onProgress(100);
       onComplete(url);
