@@ -6,9 +6,10 @@ interface VideoProcessorProps {
   audioFile: File;
   imageFile: File;
   isProcessing: boolean;
+  onReady?: () => void;
 }
 
-export default function VideoProcessor({ audioFile, imageFile, isProcessing }: VideoProcessorProps) {
+export default function VideoProcessor({ audioFile, imageFile, isProcessing, onReady }: VideoProcessorProps) {
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -61,6 +62,11 @@ export default function VideoProcessor({ audioFile, imageFile, isProcessing }: V
         audioRef.current.src = audioUrl;
         setProgress(60);
 
+        // Auto-play when ready
+        audioRef.current.oncanplaythrough = () => {
+          audioRef.current?.play();
+        };
+
         // Initialize audio context on play
         audioRef.current.onplay = () => {
           if (!audioContextRef.current) {
@@ -77,6 +83,10 @@ export default function VideoProcessor({ audioFile, imageFile, isProcessing }: V
         };
 
         setProgress(100);
+
+        if (onReady) {
+          onReady();
+        }
 
         function draw() {
           if (!ctx || !analyserRef.current || !imageRef.current) return;
