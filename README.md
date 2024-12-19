@@ -1,36 +1,53 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Audio Visualizer Video Creator
 
-## Getting Started
+A web application that creates videos with audio visualization from audio files and images. Built with Next.js, FFmpeg.wasm, and Web Audio API.
 
-First, run the development server:
+## Features
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+- Upload audio files (MP3, WAV) and images
+- Real-time audio visualization preview
+- Generate videos with audio visualization overlay
+- Download generated videos
+- Modern, responsive UI with Tailwind CSS
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Prerequisites
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+- Node.js 18+ installed
+- Modern web browser with WebAssembly support
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Setup
 
-## Learn More
+1. Clone the repository
+2. Install dependencies:
+   ```bash
+   npm install
+   ```
+3. Start the development server:
+   ```bash
+   npm run dev
+   ```
+4. Open [http://localhost:3000](http://localhost:3000) in your browser
 
-To learn more about Next.js, take a look at the following resources:
+## Usage
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+1. Drag and drop or click to upload an audio file (MP3 or WAV) and an image
+2. Preview the audio visualization
+3. Click "Create Video" to generate the video
+4. Once processing is complete, preview the video and download it
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Technical Stack
 
-## Deploy on Vercel
+- Next.js 14+
+- React
+- TypeScript
+- Tailwind CSS
+- FFmpeg.wasm
+- Web Audio API
+- Canvas API
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Notes
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- The application processes files entirely in the browser
+- Video processing may take some time depending on the file sizes and your device's capabilities
+- Supported audio formats: MP3, WAV
+- Supported image formats: JPG, PNG
