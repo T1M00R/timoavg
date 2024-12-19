@@ -159,7 +159,16 @@ export default function VideoProcessor({
             const barHeight = (dataArray[i] * settings.barHeight) * (maxBarHeight / 255);
             const y = settings.position === 'bottom' ? canvas.height - barHeight : 0;
             
-            ctx.fillStyle = getColorForScheme(barHeight, maxBarHeight);
+            const color = getColorForScheme(barHeight, maxBarHeight);
+            
+            if (settings.glow) {
+              ctx.shadowBlur = 15;
+              ctx.shadowColor = color;
+            } else {
+              ctx.shadowBlur = 0;
+            }
+            
+            ctx.fillStyle = color;
 
             switch (settings.shape) {
               case 'rectangle':

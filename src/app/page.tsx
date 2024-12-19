@@ -11,6 +11,7 @@ export interface VisualizerSettings {
   colorScheme: 'greenRed' | 'bluePurple' | 'rainbow' | 'white' | 'purpleGold' | 'oceanBlue' | 'sunset' | 'neon';
   position: 'bottom' | 'top';
   shape: 'rectangle' | 'rounded' | 'pill' | 'triangle';
+  glow: boolean;
 }
 
 const COLOR_SCHEMES = {
@@ -38,7 +39,8 @@ export default function Home() {
     barHeight: 0.7,
     colorScheme: 'greenRed',
     position: 'bottom',
-    shape: 'rounded'
+    shape: 'rounded',
+    glow: false
   });
 
   const onDropAudio = useCallback((acceptedFiles: File[]) => {
@@ -307,6 +309,22 @@ export default function Home() {
                 <option value="bottom">Bottom</option>
                 <option value="top">Top</option>
               </select>
+            </div>
+
+            <div className="flex items-center justify-between">
+              <label className="text-sm text-gray-400">Glow Effect</label>
+              <button
+                onClick={() => setVisualizerSettings(prev => ({ ...prev, glow: !prev.glow }))}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 focus:outline-none ${
+                  visualizerSettings.glow ? 'bg-blue-600' : 'bg-gray-700'
+                }`}
+              >
+                <span
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform duration-200 ${
+                    visualizerSettings.glow ? 'translate-x-6' : 'translate-x-1'
+                  }`}
+                />
+              </button>
             </div>
           </div>
         </div>
