@@ -1,15 +1,23 @@
 'use client';
 
 import { useEffect, useState, useRef } from 'react';
+import { VisualizerSettings } from '@/app/page';
 
 interface VideoProcessorProps {
   audioFile: File;
   imageFile: File;
   isProcessing: boolean;
+  settings: VisualizerSettings;
   onReady?: () => void;
 }
 
-export default function VideoProcessor({ audioFile, imageFile, isProcessing, onReady }: VideoProcessorProps) {
+export default function VideoProcessor({ 
+  audioFile, 
+  imageFile, 
+  isProcessing, 
+  settings,
+  onReady 
+}: VideoProcessorProps) {
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -21,15 +29,23 @@ export default function VideoProcessor({ audioFile, imageFile, isProcessing, onR
 
   // Cleanup function
   const cleanup = () => {
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.src = '';
+    }
     if (audioContextRef.current) {
       audioContextRef.current.close();
+      audioContextRef.current = null;
     }
     if (animationRef.current) {
       cancelAnimationFrame(animationRef.current);
+      animationRef.current = null;
     }
   };
 
   useEffect(() => {
+    let isMounted = true;
+
     const setupVisualizer = async () => {
       if (!isProcessing || !canvasRef.current || !audioRef.current) return;
 
@@ -44,6 +60,7 @@ export default function VideoProcessor({ audioFile, imageFile, isProcessing, onR
 
         canvas.width = 1280;
         canvas.height = 720;
+        if (!isMounted) return;
         setProgress(20);
 
         // Load image
@@ -54,17 +71,20 @@ export default function VideoProcessor({ audioFile, imageFile, isProcessing, onR
           img.onload = () => resolve();
           img.onerror = () => reject(new Error('Failed to load image'));
         });
+        if (!isMounted) return;
         imageRef.current = img;
         setProgress(40);
 
         // Set up audio
         const audioUrl = URL.createObjectURL(audioFile);
+        if (!isMounted || !audioRef.current) return;
         audioRef.current.src = audioUrl;
         setProgress(60);
 
         // Auto-play when ready
         audioRef.current.oncanplaythrough = () => {
-          audioRef.current?.play();
+          if (!isMounted || !audioRef.current) return;
+          audioRef.current.play().catch(console.error);
         };
 
         // Initialize audio context on play
@@ -88,6 +108,30 @@ export default function VideoProcessor({ audioFile, imageFile, isProcessing, onR
           onReady();
         }
 
+        function getColorForScheme(height: number, maxHeight: number) {
+          const position = height / maxHeight;
+          
+          switch (settings.colorScheme) {
+            case 'greenRed':
+              return `rgb(${255 * position}, ${255 * (1 - position)}, 0)`;
+            case 'bluePurple':
+              return `rgb(${255 * position}, ${100 + (155 * (1 - position))}, 255)`;
+            case 'rainbow':
+              const hue = (240 * (1 - position));
+              return `hsl(${hue}, 100%, 50%)`;
+            case 'purpleGold':
+              return `rgb(${147 + (108 * position)}, ${51 + (191 * position)}, ${234 - (198 * position)})`;
+            case 'oceanBlue':
+              return `rgb(${14 + (59 * position)}, ${165 + (-35 * position)}, ${233 + (13 * position)})`;
+            case 'sunset':
+              return `rgb(${249 - (13 * position)}, ${115 - (43 * position)}, ${22 + (131 * position)})`;
+            case 'neon':
+              return `rgb(${34 + (-14 * position)}, ${197 + (-13 * position)}, ${94 + (72 * position)})`;
+            case 'white':
+              return `rgba(255, 255, 255, ${0.3 + (0.7 * position)})`;
+          }
+        }
+
         function draw() {
           if (!ctx || !analyserRef.current || !imageRef.current) return;
           
@@ -102,36 +146,83 @@ export default function VideoProcessor({ audioFile, imageFile, isProcessing, onR
           const dataArray = new Uint8Array(bufferLength);
           analyserRef.current.getByteFrequencyData(dataArray);
 
-          const barWidth = (canvas.width / bufferLength) * 2.5;
+          // Calculate bar dimensions to span full width
+          const totalWidth = canvas.width;
+          const totalBars = bufferLength;
+          const totalSpacing = (totalBars - 1) * settings.barSpacing;
+          const barWidth = (totalWidth - totalSpacing) / totalBars;
+          const maxBarHeight = canvas.height * 0.3; // 30% of canvas height
           let x = 0;
 
           // Draw bars
           for (let i = 0; i < bufferLength; i++) {
-            const barHeight = dataArray[i] * 2;
+            const barHeight = (dataArray[i] * settings.barHeight) * (maxBarHeight / 255);
+            const y = settings.position === 'bottom' ? canvas.height - barHeight : 0;
             
-            // Create gradient
-            const gradient = ctx.createLinearGradient(0, canvas.height, 0, canvas.height - barHeight);
-            gradient.addColorStop(0, '#00ff00');
-            gradient.addColorStop(1, '#ff0000');
-            
-            ctx.fillStyle = gradient;
-            ctx.fillRect(x, canvas.height - barHeight, barWidth, barHeight);
+            ctx.fillStyle = getColorForScheme(barHeight, maxBarHeight);
 
-            x += barWidth + 1;
+            switch (settings.shape) {
+              case 'rectangle':
+                ctx.fillRect(x, y, barWidth, barHeight);
+                break;
+
+              case 'rounded':
+                ctx.beginPath();
+                if (settings.position === 'bottom') {
+                  ctx.roundRect(x, y, barWidth, barHeight, [4, 4, 0, 0]);
+                } else {
+                  ctx.roundRect(x, y, barWidth, barHeight, [0, 0, 4, 4]);
+                }
+                ctx.fill();
+                break;
+
+              case 'pill':
+                ctx.beginPath();
+                const radius = barWidth / 2;
+                if (settings.position === 'bottom') {
+                  ctx.roundRect(x, y, barWidth, barHeight, [radius, radius, 0, 0]);
+                } else {
+                  ctx.roundRect(x, y, barWidth, barHeight, [0, 0, radius, radius]);
+                }
+                ctx.fill();
+                break;
+
+              case 'triangle':
+                ctx.beginPath();
+                if (settings.position === 'bottom') {
+                  ctx.moveTo(x, canvas.height);
+                  ctx.lineTo(x + barWidth / 2, canvas.height - barHeight);
+                  ctx.lineTo(x + barWidth, canvas.height);
+                } else {
+                  ctx.moveTo(x, 0);
+                  ctx.lineTo(x + barWidth / 2, barHeight);
+                  ctx.lineTo(x + barWidth, 0);
+                }
+                ctx.closePath();
+                ctx.fill();
+                break;
+            }
+
+            x += barWidth + settings.barSpacing;
           }
         }
 
       } catch (error) {
+        if (!isMounted) return;
         console.error('Error setting up visualizer:', error);
         setError('Failed to set up visualizer. Please try again.');
         cleanup();
       }
     };
 
+    cleanup(); // Clean up before setting up new visualizer
     setupVisualizer();
 
-    return cleanup;
-  }, [isProcessing, audioFile, imageFile]);
+    return () => {
+      isMounted = false;
+      cleanup();
+    };
+  }, [isProcessing, audioFile, imageFile, settings]);
 
   return (
     <div className="h-full flex flex-col">

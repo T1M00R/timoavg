@@ -3,10 +3,12 @@
 import { FFmpeg } from '@ffmpeg/ffmpeg';
 import { fetchFile, toBlobURL } from '@ffmpeg/util';
 import { useEffect, useRef, useState } from 'react';
+import { VisualizerSettings } from '@/app/page';
 
 interface VideoExporterProps {
   audioFile: File;
   imageFile: File;
+  settings: VisualizerSettings;
   onProgress: (progress: number) => void;
   onComplete: (url: string) => void;
   onError: (error: string) => void;
@@ -15,6 +17,7 @@ interface VideoExporterProps {
 export default function VideoExporter({ 
   audioFile, 
   imageFile, 
+  settings, 
   onProgress, 
   onComplete,
   onError 
@@ -56,7 +59,13 @@ export default function VideoExporter({
     
     const bufferLength = analyser.frequencyBinCount;
     const dataArray = new Uint8Array(bufferLength);
-    const barWidth = (1280 / bufferLength) * 2.5;
+    const maxBarHeight = 720 * 0.3; // 30% of height
+
+    // Calculate bar dimensions to span full width
+    const totalWidth = 1280;
+    const totalBars = bufferLength;
+    const totalSpacing = (totalBars - 1) * settings.barSpacing;
+    const barWidth = (totalWidth - totalSpacing) / totalBars;
 
     // Create source buffer and connect to analyzer
     const source = audioContextRef.current!.createBufferSource();
@@ -65,6 +74,30 @@ export default function VideoExporter({
     
     // Start audio
     source.start();
+
+    function getColorForScheme(height: number, maxHeight: number) {
+      const position = height / maxHeight;
+      
+      switch (settings.colorScheme) {
+        case 'greenRed':
+          return `rgb(${255 * position}, ${255 * (1 - position)}, 0)`;
+        case 'bluePurple':
+          return `rgb(${255 * position}, ${100 + (155 * (1 - position))}, 255)`;
+        case 'rainbow':
+          const hue = (240 * (1 - position));
+          return `hsl(${hue}, 100%, 50%)`;
+        case 'purpleGold':
+          return `rgb(${147 + (108 * position)}, ${51 + (191 * position)}, ${234 - (198 * position)})`;
+        case 'oceanBlue':
+          return `rgb(${14 + (59 * position)}, ${165 + (-35 * position)}, ${233 + (13 * position)})`;
+        case 'sunset':
+          return `rgb(${249 - (13 * position)}, ${115 - (43 * position)}, ${22 + (131 * position)})`;
+        case 'neon':
+          return `rgb(${34 + (-14 * position)}, ${197 + (-13 * position)}, ${94 + (72 * position)})`;
+        case 'white':
+          return `rgba(255, 255, 255, ${0.3 + (0.7 * position)})`;
+      }
+    }
 
     // Capture frames
     for (let frame = 0; frame < totalFrames.current; frame++) {
@@ -76,18 +109,53 @@ export default function VideoExporter({
       ctx.drawImage(img, 0, 0, 1280, 720);
 
       // Draw bars
-      let x = 0;
       for (let i = 0; i < bufferLength; i++) {
-        const barHeight = dataArray[i] * 2;
+        const barHeight = (dataArray[i] * settings.barHeight) * (maxBarHeight / 255);
+        const y = settings.position === 'bottom' ? 720 - barHeight : 0;
         
-        const gradient = ctx.createLinearGradient(0, 720, 0, 720 - barHeight);
-        gradient.addColorStop(0, '#00ff00');
-        gradient.addColorStop(1, '#ff0000');
-        
-        ctx.fillStyle = gradient;
-        ctx.fillRect(x, 720 - barHeight, barWidth, barHeight);
+        ctx.fillStyle = getColorForScheme(barHeight, maxBarHeight);
 
-        x += barWidth + 1;
+        switch (settings.shape) {
+          case 'rectangle':
+            ctx.fillRect(i * barWidth, y, barWidth, barHeight);
+            break;
+
+          case 'rounded':
+            ctx.beginPath();
+            if (settings.position === 'bottom') {
+              ctx.roundRect(i * barWidth, y, barWidth, barHeight, [4, 4, 0, 0]);
+            } else {
+              ctx.roundRect(i * barWidth, y, barWidth, barHeight, [0, 0, 4, 4]);
+            }
+            ctx.fill();
+            break;
+
+          case 'pill':
+            ctx.beginPath();
+            const radius = barWidth / 2;
+            if (settings.position === 'bottom') {
+              ctx.roundRect(i * barWidth, y, barWidth, barHeight, [radius, radius, 0, 0]);
+            } else {
+              ctx.roundRect(i * barWidth, y, barWidth, barHeight, [0, 0, radius, radius]);
+            }
+            ctx.fill();
+            break;
+
+          case 'triangle':
+            ctx.beginPath();
+            if (settings.position === 'bottom') {
+              ctx.moveTo(i * barWidth, 720);
+              ctx.lineTo(i * barWidth + barWidth / 2, 720 - barHeight);
+              ctx.lineTo(i * barWidth + barWidth, 720);
+            } else {
+              ctx.moveTo(i * barWidth, 0);
+              ctx.lineTo(i * barWidth + barWidth / 2, barHeight);
+              ctx.lineTo(i * barWidth + barWidth, 0);
+            }
+            ctx.closePath();
+            ctx.fill();
+            break;
+        }
       }
 
       // Save frame
