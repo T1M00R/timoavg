@@ -1,8 +1,6 @@
 'use client';
 
 import { useEffect, useState, useRef } from 'react';
-import { FFmpeg } from '@ffmpeg/ffmpeg';
-import { fetchFile, toBlobURL } from '@ffmpeg/util';
 
 interface VideoProcessorProps {
   audioFile: File;
@@ -11,130 +9,155 @@ interface VideoProcessorProps {
 }
 
 export default function VideoProcessor({ audioFile, imageFile, isProcessing }: VideoProcessorProps) {
-  const [ffmpeg, setFfmpeg] = useState<FFmpeg | null>(null);
   const [progress, setProgress] = useState(0);
-  const [videoUrl, setVideoUrl] = useState<string | null>(null);
-  const videoRef = useRef<HTMLVideoElement>(null);
+  const [error, setError] = useState<string | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const audioRef = useRef<HTMLAudioElement>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const analyserRef = useRef<AnalyserNode | null>(null);
+  const imageRef = useRef<HTMLImageElement>(null);
+  const animationRef = useRef<number | null>(null);
+
+  // Cleanup function
+  const cleanup = () => {
+    if (audioContextRef.current) {
+      audioContextRef.current.close();
+    }
+    if (animationRef.current) {
+      cancelAnimationFrame(animationRef.current);
+    }
+  };
 
   useEffect(() => {
-    const load = async () => {
-      const ffmpeg = new FFmpeg();
-      
-      ffmpeg.on('progress', ({ progress }) => {
-        setProgress(Math.round(progress * 100));
-      });
-
-      await ffmpeg.load({
-        coreURL: await toBlobURL('/_next/static/ffmpeg/ffmpeg-core.js', 'text/javascript'),
-        wasmURL: await toBlobURL('/_next/static/ffmpeg/ffmpeg-core.wasm', 'application/wasm'),
-      });
-
-      setFfmpeg(ffmpeg);
-    };
-
-    load();
-  }, []);
-
-  useEffect(() => {
-    const processVideo = async () => {
-      if (!ffmpeg || !isProcessing) return;
+    const setupVisualizer = async () => {
+      if (!isProcessing || !canvasRef.current || !audioRef.current) return;
 
       try {
-        // Write input files
-        await ffmpeg.writeFile('audio.mp3', await fetchFile(audioFile));
-        await ffmpeg.writeFile('image.jpg', await fetchFile(imageFile));
+        setProgress(0);
+        setError(null);
+        
+        // Set up canvas
+        const canvas = canvasRef.current;
+        const ctx = canvas.getContext('2d') as CanvasRenderingContext2D | null;
+        if (!ctx) throw new Error('Could not get canvas context');
 
-        // Optimize video generation with better compression and faster processing
-        await ffmpeg.exec([
-          '-i', 'image.jpg',
-          '-i', 'audio.mp3',
-          '-filter_complex', 
-          '[0:v]scale=1280:720,loop=loop=-1:size=1[v];[1:a]showwaves=s=1280x720:mode=line:rate=25:colors=white|blue@0.5,colorkey=black:0.01:0.1[waves];[v][waves]overlay=format=auto,format=yuv420p[out]',
-          '-map', '[out]',
-          '-map', '1:a',
-          '-c:v', 'libx264',
-          '-preset', 'veryfast',  // Faster encoding
-          '-crf', '23',          // Good quality but smaller file
-          '-c:a', 'aac',
-          '-b:a', '128k',        // Reduced audio bitrate
-          '-shortest',
-          'output.mp4'
-        ]);
+        canvas.width = 1280;
+        canvas.height = 720;
+        setProgress(20);
 
-        // Read the output file
-        const data = await ffmpeg.readFile('output.mp4');
-        const blob = new Blob([data], { type: 'video/mp4' });
-        const url = URL.createObjectURL(blob);
-        setVideoUrl(url);
+        // Load image
+        const img = new Image();
+        const imageUrl = URL.createObjectURL(imageFile);
+        img.src = imageUrl;
+        await new Promise<void>((resolve, reject) => {
+          img.onload = () => resolve();
+          img.onerror = () => reject(new Error('Failed to load image'));
+        });
+        imageRef.current = img;
+        setProgress(40);
 
-        // Clean up memory
-        await ffmpeg.deleteFile('audio.mp3');
-        await ffmpeg.deleteFile('image.jpg');
-        await ffmpeg.deleteFile('output.mp4');
+        // Set up audio
+        const audioUrl = URL.createObjectURL(audioFile);
+        audioRef.current.src = audioUrl;
+        setProgress(60);
+
+        // Initialize audio context on play
+        audioRef.current.onplay = () => {
+          if (!audioContextRef.current) {
+            audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+            analyserRef.current = audioContextRef.current.createAnalyser();
+            analyserRef.current.fftSize = 256;
+            
+            const source = audioContextRef.current.createMediaElementSource(audioRef.current!);
+            source.connect(analyserRef.current);
+            analyserRef.current.connect(audioContextRef.current.destination);
+            
+            draw();
+          }
+        };
+
+        setProgress(100);
+
+        function draw() {
+          if (!ctx || !analyserRef.current || !imageRef.current) return;
+          
+          animationRef.current = requestAnimationFrame(draw);
+
+          // Clear and draw background
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+          ctx.drawImage(imageRef.current, 0, 0, canvas.width, canvas.height);
+
+          // Get audio data
+          const bufferLength = analyserRef.current.frequencyBinCount;
+          const dataArray = new Uint8Array(bufferLength);
+          analyserRef.current.getByteFrequencyData(dataArray);
+
+          const barWidth = (canvas.width / bufferLength) * 2.5;
+          let x = 0;
+
+          // Draw bars
+          for (let i = 0; i < bufferLength; i++) {
+            const barHeight = dataArray[i] * 2;
+            
+            // Create gradient
+            const gradient = ctx.createLinearGradient(0, canvas.height, 0, canvas.height - barHeight);
+            gradient.addColorStop(0, '#00ff00');
+            gradient.addColorStop(1, '#ff0000');
+            
+            ctx.fillStyle = gradient;
+            ctx.fillRect(x, canvas.height - barHeight, barWidth, barHeight);
+
+            x += barWidth + 1;
+          }
+        }
 
       } catch (error) {
-        console.error('Error processing video:', error);
+        console.error('Error setting up visualizer:', error);
+        setError('Failed to set up visualizer. Please try again.');
+        cleanup();
       }
     };
 
-    processVideo();
-  }, [ffmpeg, audioFile, imageFile, isProcessing]);
+    setupVisualizer();
 
-  // Clean up URLs when component unmounts
-  useEffect(() => {
-    return () => {
-      if (videoUrl) {
-        URL.revokeObjectURL(videoUrl);
-      }
-    };
-  }, [videoUrl]);
-
-  if (!isProcessing && !videoUrl) return null;
+    return cleanup;
+  }, [isProcessing, audioFile, imageFile]);
 
   return (
-    <div className="mt-2">
-      {isProcessing && (
-        <div className="mb-2">
-          <div className="w-full bg-gray-800 rounded-full h-1">
-            <div
-              className="bg-blue-500 h-1 rounded-full transition-all duration-300"
-              style={{ width: `${progress}%` }}
-            ></div>
+    <div className="h-full flex flex-col">
+      {isProcessing && progress < 100 && (
+        <div className="flex-1 flex items-center justify-center">
+          <div className="w-full max-w-md">
+            <div className="w-full bg-gray-800 rounded-full h-1">
+              <div
+                className="bg-blue-500 h-1 rounded-full transition-all duration-300"
+                style={{ width: `${progress}%` }}
+              ></div>
+            </div>
+            <p className="text-xs text-center mt-1 text-gray-400">Processing: {progress}%</p>
           </div>
-          <p className="text-xs text-center mt-1 text-gray-400">Processing: {progress}%</p>
         </div>
       )}
 
-      {videoUrl && (
-        <div className="bg-gray-800 rounded-lg p-3 border border-gray-700 mt-2">
-          <p className="text-sm text-gray-400 mb-2">Generated Video:</p>
-          <video
-            ref={videoRef}
-            controls
-            autoPlay
-            playsInline
-            className="w-full h-[180px] object-contain rounded-lg bg-black"
-            src={videoUrl}
-          >
-            Your browser does not support the video tag.
-          </video>
-          <div className="flex gap-2 mt-2">
-            <button
-              onClick={() => videoRef.current?.play()}
-              className="flex-1 bg-blue-600 text-white rounded-lg py-2 text-sm hover:bg-blue-500 transition-colors"
-            >
-              Play
-            </button>
-            <a
-              href={videoUrl}
-              download="visualizer.mp4"
-              className="flex-1 text-center bg-green-600 text-white rounded-lg py-2 text-sm hover:bg-green-500 transition-colors"
-            >
-              Download
-            </a>
-          </div>
+      {error && (
+        <div className="bg-red-500/10 border border-red-500 rounded-lg p-3">
+          <p className="text-sm text-red-400">{error}</p>
         </div>
       )}
+
+      <div className="flex-1 flex flex-col items-center justify-center">
+        <canvas 
+          ref={canvasRef}
+          className="w-full rounded-lg bg-black object-contain mb-4"
+        />
+        <audio
+          ref={audioRef}
+          controls
+          className="w-full max-w-md"
+        >
+          Your browser does not support the audio element.
+        </audio>
+      </div>
     </div>
   );
 } 

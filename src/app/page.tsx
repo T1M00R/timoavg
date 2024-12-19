@@ -2,7 +2,6 @@
 
 import { useCallback, useState } from 'react';
 import { useDropzone } from 'react-dropzone';
-import AudioVisualizer from '@/components/AudioVisualizer';
 import VideoProcessor from '@/components/VideoProcessor';
 
 export default function Home() {
@@ -43,76 +42,81 @@ export default function Home() {
   const handleProcess = async () => {
     if (!audioFile || !imageFile) return;
     setIsProcessing(true);
-    // Processing will be handled by VideoProcessor component
-    // The state will be reset when processing is complete
   };
 
   return (
     <main className="h-screen p-4 flex flex-col bg-gray-900 text-gray-100">
       <h1 className="text-2xl font-bold mb-4 text-center">Audio Visualizer Video Creator</h1>
       
-      <div className="flex-1 grid grid-cols-2 gap-4">
-        {/* Left Column - Audio */}
-        <div className="flex flex-col gap-2">
-          <div 
-            {...audioDropzone.getRootProps()} 
-            className={`border-2 border-dashed rounded-lg p-3 text-center cursor-pointer transition-colors ${
-              audioDropzone.isDragActive ? 'border-blue-400 bg-blue-500/10' : 'border-gray-700 hover:border-blue-400'
-            }`}
-          >
-            <input {...audioDropzone.getInputProps()} />
-            <p className="text-sm">Drop audio file (.mp3, .wav) or click to select</p>
+      <div className="flex-1 grid grid-cols-[1fr,1.5fr] gap-4">
+        {/* Left Column - Uploads */}
+        <div className="flex flex-col gap-4">
+          <div className="space-y-2">
+            <div 
+              {...audioDropzone.getRootProps()} 
+              className={`border-2 border-dashed rounded-lg p-3 text-center cursor-pointer transition-colors ${
+                audioDropzone.isDragActive ? 'border-blue-400 bg-blue-500/10' : 'border-gray-700 hover:border-blue-400'
+              }`}
+            >
+              <input {...audioDropzone.getInputProps()} />
+              <p className="text-sm">Drop audio file (.mp3, .wav) or click to select</p>
+            </div>
+
+            {audioFile && (
+              <div className="bg-gray-800 rounded-lg p-3 border border-gray-700">
+                <p className="text-sm text-gray-400">Audio: {audioFile.name}</p>
+              </div>
+            )}
           </div>
 
-          {audioFile && (
-            <div className="bg-gray-800 rounded-lg p-3 border border-gray-700 flex-1">
-              <p className="text-sm text-gray-400 mb-2">Audio: {audioFile.name}</p>
-              <AudioVisualizer audioFile={audioFile} />
+          <div className="space-y-2">
+            <div 
+              {...imageDropzone.getRootProps()} 
+              className={`border-2 border-dashed rounded-lg p-3 text-center cursor-pointer transition-colors ${
+                imageDropzone.isDragActive ? 'border-blue-400 bg-blue-500/10' : 'border-gray-700 hover:border-blue-400'
+              }`}
+            >
+              <input {...imageDropzone.getInputProps()} />
+              <p className="text-sm">Drop image file (.jpg, .png) or click to select</p>
             </div>
-          )}
-        </div>
 
-        {/* Right Column - Image */}
-        <div className="flex flex-col gap-2">
-          <div 
-            {...imageDropzone.getRootProps()} 
-            className={`border-2 border-dashed rounded-lg p-3 text-center cursor-pointer transition-colors ${
-              imageDropzone.isDragActive ? 'border-blue-400 bg-blue-500/10' : 'border-gray-700 hover:border-blue-400'
-            }`}
-          >
-            <input {...imageDropzone.getInputProps()} />
-            <p className="text-sm">Drop image file (.jpg, .png) or click to select</p>
+            {imageFile && (
+              <div className="bg-gray-800 rounded-lg p-3 border border-gray-700">
+                <p className="text-sm text-gray-400 mb-2">Image: {imageFile.name}</p>
+                <img 
+                  src={URL.createObjectURL(imageFile)} 
+                  alt="Preview" 
+                  className="w-full h-[180px] object-contain rounded-lg"
+                />
+              </div>
+            )}
           </div>
 
-          {imageFile && (
-            <div className="bg-gray-800 rounded-lg p-3 border border-gray-700 flex-1">
-              <p className="text-sm text-gray-400 mb-2">Image: {imageFile.name}</p>
-              <img 
-                src={URL.createObjectURL(imageFile)} 
-                alt="Preview" 
-                className="w-full h-[180px] object-contain rounded-lg"
-              />
+          <button
+            onClick={handleProcess}
+            disabled={!audioFile || !imageFile || isProcessing}
+            className="w-full py-2 bg-blue-600 text-white rounded-lg disabled:bg-gray-700 disabled:text-gray-400 disabled:cursor-not-allowed hover:bg-blue-500 transition-colors mt-auto"
+          >
+            {isProcessing ? 'Processing...' : 'Create Video'}
+          </button>
+        </div>
+
+        {/* Right Column - Video Preview */}
+        <div className="bg-gray-800/50 rounded-lg p-4 border border-gray-700">
+          {(!audioFile || !imageFile) && !isProcessing && (
+            <div className="h-full flex items-center justify-center text-gray-500">
+              <p>Upload audio and image files to create a video</p>
             </div>
           )}
+          
+          {audioFile && imageFile && (
+            <VideoProcessor
+              audioFile={audioFile}
+              imageFile={imageFile}
+              isProcessing={isProcessing}
+            />
+          )}
         </div>
-      </div>
-
-      <div className="mt-2">
-        <button
-          onClick={handleProcess}
-          disabled={!audioFile || !imageFile || isProcessing}
-          className="w-full py-2 bg-blue-600 text-white rounded-lg disabled:bg-gray-700 disabled:text-gray-400 disabled:cursor-not-allowed hover:bg-blue-500 transition-colors"
-        >
-          {isProcessing ? 'Processing...' : 'Create Video'}
-        </button>
-
-        {audioFile && imageFile && (
-          <VideoProcessor
-            audioFile={audioFile}
-            imageFile={imageFile}
-            isProcessing={isProcessing}
-          />
-        )}
       </div>
     </main>
   );
